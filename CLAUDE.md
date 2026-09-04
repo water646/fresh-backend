@@ -27,7 +27,7 @@ mvn test
 - 也可直接在 IDE 中运行启动类 `com.fresh.FreshApplication`（fresh-server 模块）。
 - 服务端口 8080，接口文档（knife4j）：http://localhost:8080/doc.html ，分"管理端接口"和"用户端接口"两个分组。
 - fresh-server 的 maven-compiler-plugin 设为 source/target 9，请使用 JDK 9+ 构建。
-- 注意：`.gitignore` 中忽略了 `*Test.java` 和 `**/test/`，本地实验性测试代码不会被提交。
+- 测试：集成测试位于 `fresh-server/src/test/java`（连本机 MySQL/Redis/RabbitMQ，如 `SeckillOrderCancelTest`、`SeckillConcurrencyTest`），IDEA 中可直接点运行键，命令行跑法同上（需 JDK 17）。
 
 ## 运行环境依赖
 
