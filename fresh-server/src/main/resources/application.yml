@@ -1,0 +1,67 @@
+server:
+  port: 8080
+
+spring:
+  profiles:
+    active: dev
+  main:
+    allow-circular-references: true
+  datasource:
+    druid:
+      driver-class-name: ${fresh.datasource.driver-class-name}
+      url: jdbc:mysql://${fresh.datasource.host}:${fresh.datasource.port}/${fresh.datasource.database}?serverTimezone=Asia/Shanghai&useUnicode=true&characterEncoding=utf-8&zeroDateTimeBehavior=convertToNull&useSSL=false&allowPublicKeyRetrieval=true
+      username: ${fresh.datasource.username}
+      password: ${fresh.datasource.password}
+  redis:
+    host: ${fresh.redis.host}
+    port: ${fresh.redis.port}
+    password: ${fresh.redis.password}
+    database: ${fresh.redis.database}
+  rabbitmq:
+    host: localhost
+    port: 5672
+    virtual-host: /fresh
+    username: fresh_market
+    password: 123
+  servlet:
+    multipart:
+      # 上传文件大小限制
+      max-file-size: 10MB
+      max-request-size: 10MB
+
+
+mybatis-plus:
+  #mapper配置文件
+  mapper-locations: classpath:mapper/*.xml
+  type-aliases-package: com.fresh.entity
+  configuration:
+    #开启驼峰命名
+    map-underscore-to-camel-case: true
+
+logging:
+  level:
+    com:
+      fresh:
+        mapper: info
+        service: info
+        controller: info
+
+fresh:
+  jwt:
+    # 设置jwt签名加密时使用的秘钥
+    admin-secret-key: itcast
+    # 设置jwt过期时间
+    admin-ttl: 720000000
+    # 设置前端传递过来的令牌名称
+    admin-token-name: token
+    user-secret-key: itheima
+    user-token-name: authentication
+    user-ttl: 72000000
+  file:
+    # 上传文件的本地存储根目录（不存在会自动创建），/uploads/** 映射到这里
+    base-dir: ${user.home}/fresh-market/upload
+  alioss:
+    endpoint: ${fresh.alioss.endpoint}
+    access-key-id: ${fresh.alioss.access-key-id}
+    access-key-secret: ${fresh.alioss.access-key-secret}
+    bucket-name: ${fresh.alioss.bucket-name}
