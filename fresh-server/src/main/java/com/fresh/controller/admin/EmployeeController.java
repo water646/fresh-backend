@@ -9,9 +9,10 @@ import com.fresh.result.PageResult;
 import com.fresh.result.Result;
 import com.fresh.service.EmployeeService;
 import com.fresh.vo.EmployeeLoginVO;
-import io.swagger.annotations.Api;
-import io.swagger.annotations.ApiOperation;
+import io.swagger.v3.oas.annotations.tags.Tag;
+import io.swagger.v3.oas.annotations.Operation;
 import lombok.extern.slf4j.Slf4j;
+import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -25,7 +26,7 @@ import org.springframework.web.bind.annotation.RestController;
  */
 @RestController
 @RequestMapping("/admin/employee")
-@Api(tags = "员工相关接口")
+@Tag(name = "员工相关接口")
 @Slf4j
 public class EmployeeController {
 
@@ -38,8 +39,8 @@ public class EmployeeController {
      * @return 员工登录后返回的数据
      */
     @PostMapping("/login")
-    @ApiOperation("员工登录")
-    public Result<EmployeeLoginVO> login(@RequestBody EmployeeLoginDTO employeeLoginDTO) {
+    @Operation(summary = "员工登录")
+    public Result<EmployeeLoginVO> login(@Valid @RequestBody EmployeeLoginDTO employeeLoginDTO) {
         log.info("员工登录：{}", employeeLoginDTO.getUsername());
         EmployeeLoginVO employeeLoginVO = employeeService.login(employeeLoginDTO);
         return Result.success(employeeLoginVO);
@@ -51,8 +52,8 @@ public class EmployeeController {
      * @return 成功标识
      */
     @PostMapping("/add")
-    @ApiOperation("新增员工")
-    public Result save(@RequestBody EmployeeAddDTO employeeAddDTO) {
+    @Operation(summary = "新增员工")
+    public Result save(@Valid @RequestBody EmployeeAddDTO employeeAddDTO) {
         log.info("新增员工：{}", employeeAddDTO);
         employeeService.save(employeeAddDTO);
         return Result.success();
@@ -64,7 +65,7 @@ public class EmployeeController {
      * @return 分页结果
      */
     @GetMapping("/page")
-    @ApiOperation("分页查询员工")
+    @Operation(summary = "分页查询员工")
     public Result<PageResult> page(EmployeePageQueryDTO employeePageQueryDTO) {
         log.info("分页查询员工：{}", employeePageQueryDTO);
         return Result.success(employeeService.pageQuery(employeePageQueryDTO));
@@ -76,7 +77,7 @@ public class EmployeeController {
      * @return 员工信息（不存在时 data 为 null，不含密码）
      */
     @GetMapping("/get")
-    @ApiOperation("根据id查询员工")
+    @Operation(summary = "根据id查询员工")
     public Result<Employee> get(Long id) {
         log.info("根据id查询员工：{}", id);
         return Result.success(employeeService.getById(id));
@@ -88,7 +89,7 @@ public class EmployeeController {
      * @return 成功标识
      */
     @DeleteMapping("/delete")
-    @ApiOperation("根据id删除员工")
+    @Operation(summary = "根据id删除员工")
     public Result delete(Long id) {
         log.info("根据id删除员工：{}", id);
         employeeService.delete(id);
@@ -101,8 +102,8 @@ public class EmployeeController {
      * @return 成功标识
      */
     @PostMapping("/update")
-    @ApiOperation("修改员工")
-    public Result update(@RequestBody EmployeeUpdateDTO employeeUpdateDTO) {
+    @Operation(summary = "修改员工")
+    public Result update(@Valid @RequestBody EmployeeUpdateDTO employeeUpdateDTO) {
         log.info("修改员工：{}", employeeUpdateDTO);
         employeeService.update(employeeUpdateDTO);
         return Result.success();

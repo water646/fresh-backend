@@ -3,8 +3,8 @@ package com.fresh.controller.user;
 import com.fresh.entity.Category;
 import com.fresh.result.Result;
 import com.fresh.service.CategoryService;
-import io.swagger.annotations.Api;
-import io.swagger.annotations.ApiOperation;
+import io.swagger.v3.oas.annotations.tags.Tag;
+import io.swagger.v3.oas.annotations.Operation;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -19,7 +19,7 @@ import java.util.List;
  */
 @RestController("userCategoryController")
 @RequestMapping("/user/category")
-@Api(tags = "C端分类相关接口")
+@Tag(name = "C端分类相关接口")
 @Slf4j
 public class CategoryController {
 
@@ -31,7 +31,7 @@ public class CategoryController {
      * @return 分类列表
      */
     @GetMapping("/list")
-    @ApiOperation("查询所有启用的分类")
+    @Operation(summary = "查询所有启用的分类")
     public Result<List<Category>> list() {
         log.info("C端查询所有启用的分类");
         return Result.success(categoryService.listEnabled());

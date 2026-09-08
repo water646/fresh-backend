@@ -13,11 +13,10 @@ import com.fresh.result.PageResult;
 import com.fresh.result.Result;
 import com.fresh.service.OrdersService;
 import com.fresh.vo.OrderVO;
-import io.swagger.annotations.Api;
-import io.swagger.annotations.ApiOperation;
+import io.swagger.v3.oas.annotations.tags.Tag;
+import io.swagger.v3.oas.annotations.Operation;
 import lombok.extern.slf4j.Slf4j;
-import org.redisson.api.RLock;
-import org.redisson.api.RedissonClient;
+import jakarta.validation.Valid;
 import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
@@ -29,41 +28,26 @@ import java.util.List;
 
 @RestController("userOrdersController")
 @RequestMapping("/user/orders")
-@Api(tags = "C端订单相关接口")
+@Tag(name = "C端订单相关接口")
 @Slf4j
 public class OrdersController {
 
     @Autowired
     private OrdersService ordersService;
 
-    @Autowired
-    private RedissonClient redissonClient;
-
     @PostMapping("/submit")
-    @ApiOperation("提交订单")
-    public Result submitOrder(@RequestBody OrdersSubmitDTO ordersSubmitDTO){
+    @Operation(summary = "提交订单")
+    public Result submitOrder(@Valid @RequestBody OrdersSubmitDTO ordersSubmitDTO){
         //返回订单（含自增 id 与订单号 number），前端支付要 orderNumber、查详情要 id
         return Result.success(ordersService.submitOrder(ordersSubmitDTO));
     }
 
     @PutMapping("/payment")
-    @ApiOperation("订单支付")
-    public Result payment(@RequestBody OrdersPaymentDTO ordersPaymentDTO) throws Exception {
+    @Operation(summary = "订单支付")
+    public Result payment(@Valid @RequestBody OrdersPaymentDTO ordersPaymentDTO) {
         log.info("订单支付：{}",ordersPaymentDTO);
-
-        //用redisson锁，防误删、自动续期、支持阻塞等待、可重入
-        RLock lock = redissonClient.getLock("payment_lock:"+ordersPaymentDTO.getOrderNumber());
-        if(!lock.tryLock()){
-            return Result.error("请勿重复支付");
-        }
-
-        //拿到锁之后，执行支付逻辑
-        try{
-            ordersService.paySuccess(ordersPaymentDTO.getOrderNumber());
-        }finally {
-            lock.unlock();
-        }
-
+        //防重复支付锁在 service 层（paySuccess 内），controller 只做转发
+        ordersService.paySuccess(ordersPaymentDTO.getOrderNumber());
         return Result.success();
     }
 
@@ -73,7 +57,7 @@ public class OrdersController {
      * @return 订单详情 VO
      */
     @GetMapping("/detail")
-    @ApiOperation("查询订单详情（含订单明细）")
+    @Operation(summary = "查询订单详情（含订单明细）")
     public Result<OrderVO> detail(Long id) {
         log.info("查询订单详情：{}", id);
         return Result.success(ordersService.getOrderDetail(id));
@@ -100,8 +84,8 @@ public class OrdersController {
     public Result cancel(Long id){
         LambdaUpdateWrapper<Orders> uw = new LambdaUpdateWrapper<>();
         uw.eq(Orders::getId,id);
-        uw.eq(Orders::getStatus,1);
-        uw.set(Orders::getStatus,6);
+        uw.eq(Orders::getStatus, Orders.PENDING_PAYMENT);
+        uw.set(Orders::getStatus, Orders.CANCELLED);
         uw.set(Orders::getCancelReason,"用户取消订单");
         uw.set(Orders::getCancelTime, LocalDateTime.now());
 

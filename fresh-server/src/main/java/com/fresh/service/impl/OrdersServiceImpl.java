@@ -4,6 +4,7 @@ import com.alibaba.fastjson.JSON;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+import com.fresh.constant.RedisConstant;
 import com.fresh.context.BaseContext;
 import com.fresh.dto.OrdersPageQueryDTO;
 import com.fresh.dto.OrdersSubmitDTO;
@@ -22,6 +23,8 @@ import com.github.pagehelper.Page;
 import com.github.pagehelper.PageHelper;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
+import org.redisson.api.RLock;
+import org.redisson.api.RedissonClient;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -68,13 +71,16 @@ public class OrdersServiceImpl extends ServiceImpl<OrdersMapper,Orders> implemen
     @Autowired
     private RabbitTemplate rabbitTemplate;
 
+    @Autowired
+    private RedissonClient redissonClient;
+
     @Transactional
     public Orders submitOrder(OrdersSubmitDTO ordersSubmitDTO){
         Long userId = BaseContext.getCurrentId();
         Orders orders = new Orders();
 
         String date = LocalDate.now().format(DateTimeFormatter.ofPattern("yyyyMMdd"));
-        String key = "icr:orders:"+date;
+        String key = RedisConstant.ORDER_SEQUENCE_KEY + date;
 
         Long sequence = stringRedisTemplate.opsForValue().increment(key);
         String orderNumber = date + String.format("%08d", sequence);
@@ -91,10 +97,10 @@ public class OrdersServiceImpl extends ServiceImpl<OrdersMapper,Orders> implemen
         BeanUtils.copyProperties(ordersSubmitDTO,orders);
         orders.setUserId(userId);
         orders.setNumber(orderNumber);
-        orders.setStatus(1);
+        orders.setStatus(Orders.PENDING_PAYMENT);
         orders.setOrderTime(LocalDateTime.now());
         orders.setEstimatedDeliveryTime(LocalDateTime.now().plusMinutes(30));
-        orders.setPayStatus(0);
+        orders.setPayStatus(Orders.PAY_STATUS_UNPAID);
         orders.setAddressBookId(addressBook.getId());
         orders.setUserName(user.getName());
         orders.setPhone(addressBook.getPhone());
@@ -136,7 +142,8 @@ public class OrdersServiceImpl extends ServiceImpl<OrdersMapper,Orders> implemen
 
             //订单取消的延时消息丢MQ
             rabbitTemplate.convertAndSend("fresh.order.delay.direct","delay",orders.getNumber(),msg->{
-                msg.getMessageProperties().setDelay(900000);
+                //spring-amqp 3.x 移除了 setDelay(int)，改用 setDelayLong
+                msg.getMessageProperties().setDelayLong(900000L);
                 return msg;
             });
 
@@ -148,29 +155,38 @@ public class OrdersServiceImpl extends ServiceImpl<OrdersMapper,Orders> implemen
 
     @Transactional
     public int paySuccess(String orderNumber){
-
-        //只有待支付的订单可以转变订单状态，防止用户支付了取消的订单，乐观锁防重复支付
-        LambdaUpdateWrapper<Orders> uw = new LambdaUpdateWrapper<>();
-        uw.eq(Orders::getNumber,orderNumber);
-        uw.eq(Orders::getStatus,1);
-        uw.set(Orders::getCheckoutTime,LocalDateTime.now());
-        uw.set(Orders::getPayStatus,1);
-        uw.set(Orders::getStatus,2);
-
-        int rows = ordersMapper.update(null,uw);
-        if(rows==0){
-            throw new OrderStatusException("订单已取消或已支付");
+        //用redisson锁，防误入、自动续期、支持阻塞等待、可重入。
+        //即使锁释放与事务提交间存在极小窗口，下方条件更新仍会兜底拒绝重复支付
+        RLock lock = redissonClient.getLock(RedisConstant.PAYMENT_LOCK_KEY + orderNumber);
+        if(!lock.tryLock()){
+            throw new BaseException("请勿重复支付");
         }
-        log.info("支付成功");
+        try{
+            //只有待支付的订单可以转变订单状态，防止用户支付了取消的订单，乐观锁防重复支付
+            LambdaUpdateWrapper<Orders> uw = new LambdaUpdateWrapper<>();
+            uw.eq(Orders::getNumber,orderNumber);
+            uw.eq(Orders::getStatus, Orders.PENDING_PAYMENT);
+            uw.set(Orders::getCheckoutTime,LocalDateTime.now());
+            uw.set(Orders::getPayStatus, Orders.PAY_STATUS_PAID);
+            uw.set(Orders::getStatus, Orders.TO_BE_CONFIRMED);
 
-        LambdaQueryWrapper<Orders> qw = new LambdaQueryWrapper<>();
-        qw.eq(Orders::getNumber,orderNumber);
-        Orders orders = ordersMapper.selectOne(qw);
+            int rows = ordersMapper.update(null,uw);
+            if(rows==0){
+                throw new OrderStatusException("订单已取消或已支付");
+            }
+            log.info("支付成功");
 
-        //通知商家来单
-        notifyMerchant(orders.getId(), orderNumber);
+            LambdaQueryWrapper<Orders> qw = new LambdaQueryWrapper<>();
+            qw.eq(Orders::getNumber,orderNumber);
+            Orders orders = ordersMapper.selectOne(qw);
 
-        return rows;
+            //通知商家来单
+            notifyMerchant(orders.getId(), orderNumber);
+
+            return rows;
+        }finally {
+            lock.unlock();
+        }
     }
 
     /**

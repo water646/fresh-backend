@@ -43,12 +43,12 @@ public class OrderDelayListener {
 
         Orders orders = ordersMapper.selectOne(qw_o);
         if(orders!=null){
-            if(orders.getStatus()==1){
+            if(Orders.PENDING_PAYMENT.equals(orders.getStatus())){
                 //乐观锁防止与支付相撞
                 LambdaUpdateWrapper<Orders> uw = new LambdaUpdateWrapper<>();
                 uw.eq(Orders::getNumber,orderNumber);
-                uw.eq(Orders::getStatus,1);
-                uw.set(Orders::getStatus,6);
+                uw.eq(Orders::getStatus, Orders.PENDING_PAYMENT);
+                uw.set(Orders::getStatus, Orders.CANCELLED);
                 uw.set(Orders::getCancelReason,"订单超时取消");
                 uw.set(Orders::getCancelTime,LocalDateTime.now());
 

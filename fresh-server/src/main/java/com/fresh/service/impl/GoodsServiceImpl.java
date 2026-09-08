@@ -4,6 +4,7 @@ import com.alibaba.fastjson.JSON;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+import com.fresh.constant.RedisConstant;
 import com.fresh.dto.GoodsAddDTO;
 import com.fresh.dto.GoodsPageQueryDTO;
 import com.fresh.dto.GoodsUpdateDTO;
@@ -48,7 +49,7 @@ public class GoodsServiceImpl extends ServiceImpl<GoodsMapper,Goods> implements 
         goodsMapper.insert(goods);
 
         //删对应分类的缓存
-        stringRedisTemplate.delete("goods:"+goods.getCategoryId());
+        stringRedisTemplate.delete(RedisConstant.GOODS_CACHE_KEY +goods.getCategoryId());
     }
 
     /**
@@ -140,8 +141,8 @@ public class GoodsServiceImpl extends ServiceImpl<GoodsMapper,Goods> implements 
 
         //删除旧的分类和新的分类的缓存
         Long currentCategoryId = goodsUpdateDTO.getCategoryId();
-        stringRedisTemplate.delete("goods:"+currentCategoryId);
-        stringRedisTemplate.delete("goods:"+oldCategoryId);
+        stringRedisTemplate.delete(RedisConstant.GOODS_CACHE_KEY +currentCategoryId);
+        stringRedisTemplate.delete(RedisConstant.GOODS_CACHE_KEY +oldCategoryId);
     }
 
     /**
@@ -152,11 +153,11 @@ public class GoodsServiceImpl extends ServiceImpl<GoodsMapper,Goods> implements 
         log.info("删除商品：{}", id);
         Long categoryId = getById(id).getCategoryId();
         goodsMapper.deleteById(id);
-        stringRedisTemplate.delete("goods:"+categoryId);
+        stringRedisTemplate.delete(RedisConstant.GOODS_CACHE_KEY +categoryId);
     }
 
     public List<GoodsVO> listByCategory(Integer categoryId) {
-        String cacheGoods = stringRedisTemplate.opsForValue().get("goods:"+categoryId);
+        String cacheGoods = stringRedisTemplate.opsForValue().get(RedisConstant.GOODS_CACHE_KEY +categoryId);
         if(cacheGoods != null){
             List<GoodsVO> goodsList =  JSON.parseArray(cacheGoods,GoodsVO.class);
             return goodsList;
@@ -166,10 +167,10 @@ public class GoodsServiceImpl extends ServiceImpl<GoodsMapper,Goods> implements 
         String goodsJson = JSON.toJSONString(goodsList);
 
         if(goodsList.size()==0){
-            stringRedisTemplate.opsForValue().set("goods:"+categoryId,"[]",2, TimeUnit.MINUTES);
+            stringRedisTemplate.opsForValue().set(RedisConstant.GOODS_CACHE_KEY +categoryId,"[]",2, TimeUnit.MINUTES);
         }
         else {
-            stringRedisTemplate.opsForValue().set("goods:"+categoryId,goodsJson);
+            stringRedisTemplate.opsForValue().set(RedisConstant.GOODS_CACHE_KEY +categoryId,goodsJson);
         }
 
 
@@ -186,7 +187,7 @@ public class GoodsServiceImpl extends ServiceImpl<GoodsMapper,Goods> implements 
         //上下架改变商品是否对C端可见，需删除所属分类的缓存（与增删改保持一致），否则listByCategory会一直返回旧数据
         Goods goods = getById(goodsUpdateDTO.getId());
         if (goods != null) {
-            stringRedisTemplate.delete("goods:"+goods.getCategoryId());
+            stringRedisTemplate.delete(RedisConstant.GOODS_CACHE_KEY +goods.getCategoryId());
         }
     }
 }

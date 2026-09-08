@@ -2,6 +2,7 @@ package com.fresh.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+import com.fresh.constant.RedisConstant;
 import com.fresh.context.BaseContext;
 import com.fresh.config.RabbitMqConfig;
 import com.fresh.dto.SeckillGoodsAddDTO;
@@ -24,13 +25,11 @@ import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.script.DefaultRedisScript;
 import org.springframework.stereotype.Service;
 
-import javax.annotation.PostConstruct;
+import jakarta.annotation.PostConstruct;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.List;
+import java.util.*;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.ExecutorService;
@@ -73,7 +72,7 @@ public class SeckillServiceImpl extends ServiceImpl<SeckillMapper, SeckillGoods>
         //stock 取更新后数据库的最新值：本次没传 stock 时也不会把缓存写成 "null" 导致秒杀一直提示库存不足
         SeckillGoods dbGoods = seckillMapper.selectById(seckillGoodsUpdateDTO.getId());
         if (dbGoods != null) {
-            stringRedisTemplate.opsForValue().set("fresh:seckill:stock:" + dbGoods.getId(),
+            stringRedisTemplate.opsForValue().set(RedisConstant.SECKILL_STOCK_KEY + dbGoods.getId(),
                     String.valueOf(dbGoods.getStock()));
         }
     }
@@ -106,7 +105,7 @@ public class SeckillServiceImpl extends ServiceImpl<SeckillMapper, SeckillGoods>
     }
 
     @Override
-    public Result seckill(Long seckillGoodsId) {
+    public Map<String,Object> seckill(Long seckillGoodsId) {
 
         Long userId = BaseContext.getCurrentId();
 
@@ -118,13 +117,19 @@ public class SeckillServiceImpl extends ServiceImpl<SeckillMapper, SeckillGoods>
 
         //2.判断商品已启用（status 0禁用 1启用，禁用的秒杀商品不允许下单）
         if (seckillGoods.getStatus() == null || seckillGoods.getStatus() != 1) {
-            return Result.error("秒杀商品已禁用");
+            Map<String, Object> map = new HashMap<>();
+            map.put("code", 0);
+            map.put("msg","秒杀商品已禁用");
+            return map;
         }
 
         //3.判断在秒杀时间内
         LocalDateTime now = LocalDateTime.now();
         if(now.isBefore(seckillGoods.getStartTime())||now.isAfter(seckillGoods.getEndTime())){
-            return Result.error("不在秒杀时间内");
+            Map<String, Object> map = new HashMap<>();
+            map.put("code", 0);
+            map.put("msg","不在秒杀时间内");
+            return map;
         }
 
 
@@ -136,12 +141,15 @@ public class SeckillServiceImpl extends ServiceImpl<SeckillMapper, SeckillGoods>
 
         //不为0，代表没有购买资格
         if (r != 0) {
-            return Result.error(r==1?"库存不足":"已经购买过了");
+            Map<String, Object> map = new HashMap<>();
+            map.put("code", 0);
+            map.put("msg",r==1?"库存不足":"已经购买过了");
+            return map;
         }
 
         //5.创建订单
         String date = LocalDate.now().format(DateTimeFormatter.ofPattern("yyyyMMdd"));
-        String key = "icr:orders:"+date;
+        String key = RedisConstant.ORDER_SEQUENCE_KEY + date;
 
         Long sequence = stringRedisTemplate.opsForValue().increment(key);
         String orderNumber = date + String.format("%08d", sequence);
@@ -150,7 +158,7 @@ public class SeckillServiceImpl extends ServiceImpl<SeckillMapper, SeckillGoods>
         order.setUserId(userId);
         order.setSeckillGoodsId(seckillGoodsId);
         order.setNumber(orderNumber);
-        order.setStatus(1);
+        order.setStatus(SeckillOrders.PENDING_PAYMENT);
         order.setOrderTime(LocalDateTime.now());
         order.setAmount(seckillGoods.getSeckillPrice());
 
@@ -159,11 +167,16 @@ public class SeckillServiceImpl extends ServiceImpl<SeckillMapper, SeckillGoods>
 
         //7.MQ清理超时订单，现在投放延时消息
         rabbitTemplate.convertAndSend("fresh.order.delay.direct","delay",order.getNumber(),msg->{
-            msg.getMessageProperties().setDelay(900000);
+            //spring-amqp 3.x 移除了 setDelay(int)，改用 setDelayLong
+            msg.getMessageProperties().setDelayLong(900000L);
             return msg;
         });
 
-        return Result.success();
+        Map<String, Object> map = new HashMap<>();
+        map.put("code", 1);
+        map.put("msg","success");
+
+        return map;
     }
 
 }

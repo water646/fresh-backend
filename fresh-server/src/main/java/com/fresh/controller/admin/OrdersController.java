@@ -7,7 +7,6 @@ import com.fresh.exception.OrderStatusException;
 import com.fresh.result.PageResult;
 import com.fresh.result.Result;
 import com.fresh.service.OrdersService;
-import org.redisson.api.RedissonClient;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -21,21 +20,18 @@ public class OrdersController {
     @Autowired
     private OrdersService ordersService;
 
-    @Autowired
-    private RedissonClient redissonClient;
-
     @GetMapping("/page")
     public PageResult page(OrdersPageQueryDTO ordersPageQueryDTO){
 
         return ordersService.page(ordersPageQueryDTO);
     }
 
-    @GetMapping("/comfirm")
-    public Result comfirm(Long id){
+    @GetMapping("/confirm")
+    public Result confirm(Long id){
         LambdaUpdateWrapper<Orders> uw = new LambdaUpdateWrapper<>();
         uw.eq(Orders::getId,id);
-        uw.eq(Orders::getStatus,2);
-        uw.set(Orders::getStatus,3);
+        uw.eq(Orders::getStatus, Orders.TO_BE_CONFIRMED);
+        uw.set(Orders::getStatus, Orders.CONFIRMED);
 
         ordersService.update(uw);
         return Result.success();
@@ -45,8 +41,8 @@ public class OrdersController {
     public Result delivery(Long id){
         LambdaUpdateWrapper<Orders> uw = new LambdaUpdateWrapper<>();
         uw.eq(Orders::getId,id);
-        uw.eq(Orders::getStatus,3);
-        uw.set(Orders::getStatus,4);
+        uw.eq(Orders::getStatus, Orders.CONFIRMED);
+        uw.set(Orders::getStatus, Orders.DELIVERY_IN_PROGRESS);
 
         ordersService.update(uw);
         return Result.success();
@@ -56,8 +52,8 @@ public class OrdersController {
     public Result finish(Long id){
         LambdaUpdateWrapper<Orders> uw = new LambdaUpdateWrapper<>();
         uw.eq(Orders::getId,id);
-        uw.eq(Orders::getStatus,4);
-        uw.set(Orders::getStatus,5);
+        uw.eq(Orders::getStatus, Orders.DELIVERY_IN_PROGRESS);
+        uw.set(Orders::getStatus, Orders.COMPLETED);
         uw.set(Orders::getDeliveryTime,LocalDateTime.now());
 
         ordersService.update(uw);
@@ -68,8 +64,8 @@ public class OrdersController {
     public Result cancel(Long id){
         LambdaUpdateWrapper<Orders> uw = new LambdaUpdateWrapper<>();
         uw.eq(Orders::getId,id);
-        uw.eq(Orders::getStatus,1);
-        uw.set(Orders::getStatus,6);
+        uw.eq(Orders::getStatus, Orders.PENDING_PAYMENT);
+        uw.set(Orders::getStatus, Orders.CANCELLED);
         uw.set(Orders::getCancelReason,"商家取消订单");
         uw.set(Orders::getCancelTime, LocalDateTime.now());
 

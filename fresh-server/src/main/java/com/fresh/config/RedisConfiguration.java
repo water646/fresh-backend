@@ -4,6 +4,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.redisson.Redisson;
 import org.redisson.api.RedissonClient;
 import org.redisson.config.Config;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.data.redis.connection.RedisConnectionFactory;
@@ -26,11 +27,24 @@ public class RedisConfiguration {
         return redisTemplate;
     }
 
+    /**redis 连接参数：与 application.yml 中 spring.data.redis.* 同源于 fresh.redis.*，
+     * 真实密码在仓库外私密配置（~/.fresh-market/application-secret.yml），不再硬编码*/
+    @Value("${fresh.redis.host}")
+    private String redisHost;
+
+    @Value("${fresh.redis.port}")
+    private int redisPort;
+
+    @Value("${fresh.redis.password}")
+    private String redisPassword;
+
     @Bean
     public RedissonClient redissonClient() {
         Config config = new Config();
         //添加redis地址
-        config.useSingleServer().setAddress("redis://127.0.0.1:6379").setPassword("a123456");
+        config.useSingleServer()
+                .setAddress("redis://" + redisHost + ":" + redisPort)
+                .setPassword(redisPassword);
 
         return Redisson.create(config);
     }

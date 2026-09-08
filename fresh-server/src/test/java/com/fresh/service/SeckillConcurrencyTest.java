@@ -2,9 +2,9 @@ package com.fresh.service;
 
 import com.fresh.SeckillTestSupport;
 import com.fresh.context.BaseContext;
-import com.fresh.result.Result;
 import org.junit.jupiter.api.Test;
 
+import java.util.Map;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -77,8 +77,9 @@ public class SeckillConcurrencyTest extends SeckillTestSupport {
                 ready.countDown();
                 try {
                     go.await();
-                    Result result = seckillService.seckill(goods.getId());
-                    if (result.getCode() == 1) {
+                    //seckill() 返回 Map（code 1成功 0失败），失败时 msg 为提示文案
+                    Map<String, Object> result = seckillService.seckill(goods.getId());
+                    if (Integer.valueOf(1).equals(result.get("code"))) {
                         successCount.incrementAndGet();
                     }
                 } catch (InterruptedException e) {

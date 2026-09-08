@@ -6,10 +6,11 @@ import com.fresh.result.Result;
 import com.fresh.service.UserService;
 import com.fresh.vo.UserLoginVO;
 import com.fresh.vo.UserVO;
-import io.swagger.annotations.Api;
-import io.swagger.annotations.ApiOperation;
+import io.swagger.v3.oas.annotations.tags.Tag;
+import io.swagger.v3.oas.annotations.Operation;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
+import jakarta.validation.Valid;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -21,7 +22,7 @@ import org.springframework.web.bind.annotation.RestController;
  */
 @RestController
 @RequestMapping("/user/user")
-@Api(tags = "C端用户相关接口")
+@Tag(name = "C端用户相关接口")
 @Slf4j
 public class UserController {
 
@@ -34,8 +35,8 @@ public class UserController {
      * @return 成功标识
      */
     @PostMapping("/sendMsg")
-    @ApiOperation("发送登录验证码")
-    public Result sendMsg(@RequestBody UserLoginDTO userLoginDTO) {
+    @Operation(summary = "发送登录验证码")
+    public Result sendMsg(@Valid @RequestBody UserLoginDTO userLoginDTO) {
         log.info("发送登录验证码：{}", userLoginDTO.getPhone());
         userService.sendMsg(userLoginDTO);
         return Result.success();
@@ -47,8 +48,8 @@ public class UserController {
      * @return 登录用户id和token
      */
     @PostMapping("/login")
-    @ApiOperation("用户登录")
-    public Result<UserLoginVO> login(@RequestBody UserLoginDTO userLoginDTO) {
+    @Operation(summary = "用户登录")
+    public Result<UserLoginVO> login(@Valid @RequestBody UserLoginDTO userLoginDTO) {
         log.info("用户登录：{}", userLoginDTO.getPhone());
         return Result.success(userService.login(userLoginDTO));
     }
@@ -58,7 +59,7 @@ public class UserController {
      * @return 用户信息（不含身份证号）
      */
     @GetMapping("/get")
-    @ApiOperation("获取当前登录用户信息")
+    @Operation(summary = "获取当前登录用户信息")
     public Result<UserVO> get() {
         log.info("获取当前登录用户信息");
         return Result.success(userService.getInfo());
@@ -70,8 +71,8 @@ public class UserController {
      * @return 成功标识
      */
     @PostMapping("/update")
-    @ApiOperation("修改当前登录用户信息")
-    public Result update(@RequestBody UserUpdateDTO userUpdateDTO) {
+    @Operation(summary = "修改当前登录用户信息")
+    public Result update(@Valid @RequestBody UserUpdateDTO userUpdateDTO) {
         log.info("修改当前登录用户信息：{}", userUpdateDTO);
         userService.update(userUpdateDTO);
         return Result.success();

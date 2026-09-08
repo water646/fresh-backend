@@ -1,6 +1,7 @@
 package com.fresh;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.fresh.constant.RedisConstant;
 import com.fresh.entity.SeckillGoods;
 import com.fresh.entity.SeckillOrders;
 import com.fresh.mapper.SeckillMapper;
@@ -74,7 +75,7 @@ public abstract class SeckillTestSupport {
     }
 
     /**
-     * 造一笔秒杀订单（payStatus=1 时补齐支付相关字段）
+     * 造一笔秒杀订单（payStatus 为已支付时补齐支付相关字段）
      */
     protected SeckillOrders insertOrder(String number, int status, int payStatus, long userId) {
         SeckillOrders o = new SeckillOrders();
@@ -85,7 +86,7 @@ public abstract class SeckillTestSupport {
         o.setPayStatus(payStatus);
         o.setOrderTime(LocalDateTime.now());
         o.setAmount(new BigDecimal("1.00"));
-        if (payStatus == 1) {
+        if (payStatus == SeckillOrders.PAY_STATUS_PAID) {
             o.setPayMethod(1);
             o.setCheckoutTime(LocalDateTime.now());
         }
@@ -98,7 +99,8 @@ public abstract class SeckillTestSupport {
      */
     protected void sendDelayMessage(String number, int delayMillis) {
         rabbitTemplate.convertAndSend(DELAY_EXCHANGE, DELAY_ROUTING_KEY, number, msg -> {
-            msg.getMessageProperties().setDelay(delayMillis);
+            //spring-amqp 3.x 移除了 setDelay(int)，改用 setDelayLong
+            msg.getMessageProperties().setDelayLong((long) delayMillis);
             return msg;
         });
     }
@@ -151,10 +153,10 @@ public abstract class SeckillTestSupport {
     }
 
     protected String stockKey() {
-        return "fresh:seckill:stock:" + goods.getId();
+        return RedisConstant.SECKILL_STOCK_KEY + goods.getId();
     }
 
     protected String orderKey() {
-        return "fresh:seckill:order:" + goods.getId();
+        return RedisConstant.SECKILL_ORDER_KEY + goods.getId();
     }
 }

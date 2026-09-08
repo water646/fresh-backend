@@ -12,11 +12,13 @@ spring:
       url: jdbc:mysql://${fresh.datasource.host}:${fresh.datasource.port}/${fresh.datasource.database}?serverTimezone=Asia/Shanghai&useUnicode=true&characterEncoding=utf-8&zeroDateTimeBehavior=convertToNull&useSSL=false&allowPublicKeyRetrieval=true
       username: ${fresh.datasource.username}
       password: ${fresh.datasource.password}
-  redis:
-    host: ${fresh.redis.host}
-    port: ${fresh.redis.port}
-    password: ${fresh.redis.password}
-    database: ${fresh.redis.database}
+  data:
+    redis:
+      #Boot 3 起 Redis 配置键从 spring.redis.* 移到 spring.data.redis.*（漏改不报错，会静默连 localhost 默认库）
+      host: ${fresh.redis.host}
+      port: ${fresh.redis.port}
+      password: ${fresh.redis.password}
+      database: ${fresh.redis.database}
   rabbitmq:
     host: localhost
     port: 5672
@@ -48,13 +50,13 @@ logging:
 
 fresh:
   jwt:
-    # 设置jwt签名加密时使用的秘钥
-    admin-secret-key: water
+    # 设置jwt签名加密时使用的秘钥（HS256 要求至少 32 字节，短密钥启动签发时会直接报错）
+    admin-secret-key: fresh-market-admin-secret-key-2026!!
     # 设置jwt过期时间
     admin-ttl: 720000000
     # 设置前端传递过来的令牌名称
     admin-token-name: token
-    user-secret-key: water
+    user-secret-key: fresh-market-user-secret-key-2026!!!
     user-token-name: authentication
     user-ttl: 72000000
   file:

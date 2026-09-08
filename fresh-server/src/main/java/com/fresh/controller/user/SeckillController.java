@@ -9,9 +9,13 @@ import com.fresh.entity.SeckillGoods;
 import com.fresh.result.PageResult;
 import com.fresh.result.Result;
 import com.fresh.service.SeckillService;
+import jakarta.validation.Valid;
 import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
+
+import java.util.HashMap;
+import java.util.Map;
 
 @RestController("userSeckillController")
 @RequestMapping("/user/seckill")
@@ -27,9 +31,15 @@ public class SeckillController {
     }
 
     @PostMapping("/seckill")
-    public Result seckill(@RequestBody DoSeckillDTO doSeckillDTO){
+    public Result seckill(@Valid @RequestBody DoSeckillDTO doSeckillDTO){
 
-        return seckillService.seckill(doSeckillDTO.getSeckillGoodsId());
+        Map<String,Object> map = seckillService.seckill(doSeckillDTO.getSeckillGoodsId());
+        if(map.get("code").equals(0)){
+            return Result.error((String) map.get("msg"));
+        }
+        else{
+            return Result.success();
+        }
     }
 
 

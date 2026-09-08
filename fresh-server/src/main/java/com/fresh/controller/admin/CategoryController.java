@@ -7,10 +7,11 @@ import com.fresh.entity.Category;
 import com.fresh.result.PageResult;
 import com.fresh.result.Result;
 import com.fresh.service.CategoryService;
-import io.swagger.annotations.Api;
-import io.swagger.annotations.ApiOperation;
+import io.swagger.v3.oas.annotations.tags.Tag;
+import io.swagger.v3.oas.annotations.Operation;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
+import jakarta.validation.Valid;
 import org.springframework.web.bind.annotation.*;
 
 /**
@@ -18,7 +19,7 @@ import org.springframework.web.bind.annotation.*;
  */
 @RestController
 @RequestMapping("/admin/category")
-@Api(tags = "分类相关接口")
+@Tag(name = "分类相关接口")
 @Slf4j
 public class CategoryController {
 
@@ -31,8 +32,8 @@ public class CategoryController {
      * @return 成功标识
      */
     @PostMapping("/add")
-    @ApiOperation("新增分类")
-    public Result save(@RequestBody CategoryAddDTO categoryAddDTO) {
+    @Operation(summary = "新增分类")
+    public Result save(@Valid @RequestBody CategoryAddDTO categoryAddDTO) {
         log.info("新增分类：{}", categoryAddDTO);
         categoryService.save(categoryAddDTO);
         return Result.success();
@@ -44,7 +45,7 @@ public class CategoryController {
      * @return 分页结果
      */
     @GetMapping("/page")
-    @ApiOperation("分页查询分类")
+    @Operation(summary = "分页查询分类")
     public Result<PageResult> page(CategoryPageQueryDTO categoryPageQueryDTO) {
         return Result.success(categoryService.pageQuery(categoryPageQueryDTO));
     }
@@ -55,7 +56,7 @@ public class CategoryController {
      * @return 查询到的分类数据
      */
     @GetMapping("/get")
-    @ApiOperation("根据id查询分类")
+    @Operation(summary = "根据id查询分类")
     public Result<Category> get(Long id) {
         log.info("根据id查询分类：{}", id);
         return Result.success(categoryService.getById(id));
@@ -67,8 +68,8 @@ public class CategoryController {
      * @return 成功标识
      */
     @PostMapping("/update")
-    @ApiOperation("修改分类")
-    public Result update(@RequestBody CategoryUpdateDTO categoryUpdateDTO) {
+    @Operation(summary = "修改分类")
+    public Result update(@Valid @RequestBody CategoryUpdateDTO categoryUpdateDTO) {
         log.info("修改分类：{}", categoryUpdateDTO);
         categoryService.update(categoryUpdateDTO);
         return Result.success();
@@ -80,7 +81,7 @@ public class CategoryController {
      * @return 成功标识
      */
     @DeleteMapping("/delete")
-    @ApiOperation("根据id删除分类")
+    @Operation(summary = "根据id删除分类")
     public Result delete(Long id) {
         log.info("根据id删除分类：{}", id);
         categoryService.delete(id);

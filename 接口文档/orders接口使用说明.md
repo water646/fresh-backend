@@ -166,7 +166,7 @@ private List records; //当前页数据集合
 
 ### 2.6 管理端接单
 
-`GET /admin/orders/comfirm?id={id}`（需 token）
+`GET /admin/orders/confirm?id={id}`（需 token）
 传入订单id即可把订单的status从2变为3
 
 ### 2.7 管理端派送

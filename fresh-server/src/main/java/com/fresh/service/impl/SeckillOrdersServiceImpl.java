@@ -5,6 +5,7 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.alibaba.fastjson.JSON;
+import com.fresh.constant.RedisConstant;
 import com.fresh.context.BaseContext;
 import com.fresh.dto.SeckillOrdersPageQueryDTO;
 import com.fresh.dto.SeckillOrdersPayDTO;
@@ -24,6 +25,8 @@ import com.fresh.websocket.WebSocketServer;
 import com.github.pagehelper.Page;
 import com.github.pagehelper.PageHelper;
 import lombok.extern.slf4j.Slf4j;
+import org.redisson.api.RLock;
+import org.redisson.api.RedissonClient;
 import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.io.ClassPathResource;
@@ -54,6 +57,8 @@ public class SeckillOrdersServiceImpl extends ServiceImpl<SeckillOrdersMapper, S
     private WebSocketServer webSocketServer;
     @Autowired
     private StringRedisTemplate stringRedisTemplate;
+    @Autowired
+    private RedissonClient redissonClient;
 
     private static final DefaultRedisScript<Long> SECKILL_CANCEL_SCRIPT;
     //在static代码块加载回补库存的lua脚本，返回值是Long
@@ -129,52 +134,63 @@ public class SeckillOrdersServiceImpl extends ServiceImpl<SeckillOrdersMapper, S
     }
 
     /**
-     * 秒杀订单支付：用地址簿填充收货信息并完成支付
+     * 秒杀订单支付：用地址簿填充收货信息并完成支付。
+     * 内部用 Redisson 锁按订单号防重复支付（锁逻辑由 controller 下沉至此）
      * @param seckillOrdersPayDTO 订单号 + 地址簿id + 支付方式
      */
     public void pay(SeckillOrdersPayDTO seckillOrdersPayDTO) {
         Long userId = BaseContext.getCurrentId();
         log.info("用户 {} 秒杀订单支付：{}", userId, seckillOrdersPayDTO);
 
-        //查订单（不存在或不属于当前用户都按不存在处理，避免越权探测）
-        SeckillOrders order = seckillOrdersMapper.selectOne(
-                new LambdaQueryWrapper<SeckillOrders>().eq(SeckillOrders::getNumber, seckillOrdersPayDTO.getNumber()));
-        if (order == null || !userId.equals(order.getUserId())) {
-            throw new BaseException("订单不存在");
+        //与普通订单支付一致：redisson 锁防误入、自动续期、支持阻塞等待、可重入。
+        //即使锁释放与更新提交间存在极小窗口，下方条件更新仍会兜底拒绝重复支付
+        RLock lock = redissonClient.getLock(RedisConstant.PAYMENT_LOCK_KEY + seckillOrdersPayDTO.getNumber());
+        if (!lock.tryLock()) {
+            throw new BaseException("请勿重复支付");
         }
+        try {
+            //查订单（不存在或不属于当前用户都按不存在处理，避免越权探测）
+            SeckillOrders order = seckillOrdersMapper.selectOne(
+                    new LambdaQueryWrapper<SeckillOrders>().eq(SeckillOrders::getNumber, seckillOrdersPayDTO.getNumber()));
+            if (order == null || !userId.equals(order.getUserId())) {
+                throw new BaseException("订单不存在");
+            }
 
-        //查地址簿并校验归属（收货人/手机号/详细地址以下单时的快照形式写入订单）
-        AddressBook addressBook = addressBookMapper.selectById(seckillOrdersPayDTO.getAddressBookId());
-        if (addressBook == null || !userId.equals(addressBook.getUserId())) {
-            throw new BaseException("收货地址不存在");
+            //查地址簿并校验归属（收货人/手机号/详细地址以下单时的快照形式写入订单）
+            AddressBook addressBook = addressBookMapper.selectById(seckillOrdersPayDTO.getAddressBookId());
+            if (addressBook == null || !userId.equals(addressBook.getUserId())) {
+                throw new BaseException("收货地址不存在");
+            }
+
+            //填充收货信息 + 支付状态流转：1待付款→2待接单、payStatus 0→1、记录结账时间
+            SeckillOrders update = new SeckillOrders();
+            update.setPayMethod(seckillOrdersPayDTO.getPayMethod());
+            update.setPayStatus(SeckillOrders.PAY_STATUS_PAID);
+            update.setStatus(SeckillOrders.TO_BE_CONFIRMED);
+            update.setCheckoutTime(LocalDateTime.now());
+            update.setAddressBookId(addressBook.getId());
+            update.setConsignee(addressBook.getConsignee());
+            update.setPhone(addressBook.getPhone());
+            update.setAddress(addressBook.getDetail());
+
+            //条件更新：只有待付款的订单才能支付，防止并发/重复支付把已取消订单改回已支付
+            LambdaUpdateWrapper<SeckillOrders> wrapper = new LambdaUpdateWrapper<>();
+            wrapper.eq(SeckillOrders::getId, order.getId())
+                    .eq(SeckillOrders::getStatus, SeckillOrders.PENDING_PAYMENT);
+            int rows = seckillOrdersMapper.update(update, wrapper);
+            if (rows == 0) {
+                throw new OrderStatusException("订单已取消或已支付");
+            }
+
+            //与普通订单一致：支付成功通过 WebSocket 向商家端推送来单提醒（消息类型 type=1）
+            Map<String, Object> map = new HashMap<>();
+            map.put("type", 1);
+            map.put("orderId", order.getId());
+            map.put("content", "订单号：" + order.getNumber());
+            webSocketServer.sendToAllClient(JSON.toJSONString(map));
+        } finally {
+            lock.unlock();
         }
-
-        //填充收货信息 + 支付状态流转：1待付款→2待接单、payStatus 0→1、记录结账时间
-        SeckillOrders update = new SeckillOrders();
-        update.setPayMethod(seckillOrdersPayDTO.getPayMethod());
-        update.setPayStatus(1);
-        update.setStatus(2);
-        update.setCheckoutTime(LocalDateTime.now());
-        update.setAddressBookId(addressBook.getId());
-        update.setConsignee(addressBook.getConsignee());
-        update.setPhone(addressBook.getPhone());
-        update.setAddress(addressBook.getDetail());
-
-        //条件更新：只有待付款的订单才能支付，防止并发/重复支付把已取消订单改回已支付
-        LambdaUpdateWrapper<SeckillOrders> wrapper = new LambdaUpdateWrapper<>();
-        wrapper.eq(SeckillOrders::getId, order.getId())
-                .eq(SeckillOrders::getStatus, 1);
-        int rows = seckillOrdersMapper.update(update, wrapper);
-        if (rows == 0) {
-            throw new OrderStatusException("订单已取消或已支付");
-        }
-
-        //与普通订单一致：支付成功通过 WebSocket 向商家端推送来单提醒（消息类型 type=1）
-        Map<String, Object> map = new HashMap<>();
-        map.put("type", 1);
-        map.put("orderId", order.getId());
-        map.put("content", "订单号：" + order.getNumber());
-        webSocketServer.sendToAllClient(JSON.toJSONString(map));
     }
 
     /**
@@ -210,10 +226,10 @@ public class SeckillOrdersServiceImpl extends ServiceImpl<SeckillOrdersMapper, S
     public boolean cancelAndRestore(SeckillOrders seckillOrders, String cancelReason) {
         LambdaUpdateWrapper<SeckillOrders> uw = new LambdaUpdateWrapper<>();
         uw.eq(SeckillOrders::getId, seckillOrders.getId());
-        uw.eq(SeckillOrders::getStatus, 1);
+        uw.eq(SeckillOrders::getStatus, SeckillOrders.PENDING_PAYMENT);
         uw.set(SeckillOrders::getCancelTime, LocalDateTime.now());
         uw.set(SeckillOrders::getCancelReason, cancelReason);
-        uw.set(SeckillOrders::getStatus, 6);
+        uw.set(SeckillOrders::getStatus, SeckillOrders.CANCELLED);
 
         //rows>0 说明本次真正把订单从待付款改成已取消，此时才回补库存
         int rows = seckillOrdersMapper.update(null, uw);

@@ -11,6 +11,10 @@ import com.fresh.vo.OrderVO;
 public interface OrdersService extends IService<Orders> {
     Orders submitOrder(OrdersSubmitDTO ordersSubmitDTO);
 
+    /**
+     * 订单支付成功：状态 1待付款→2待接单，payStatus 0→1，并推送商家来单提醒。
+     * 内部按订单号加 Redisson 锁防重复支付，调用方无需自行加锁
+     */
     int paySuccess(String orderNumber);
 
     /**

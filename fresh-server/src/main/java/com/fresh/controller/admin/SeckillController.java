@@ -8,6 +8,7 @@ import com.fresh.entity.SeckillGoods;
 import com.fresh.result.PageResult;
 import com.fresh.result.Result;
 import com.fresh.service.SeckillService;
+import jakarta.validation.Valid;
 import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
@@ -20,7 +21,7 @@ public class SeckillController {
     private SeckillService seckillService;
 
     @PostMapping("/save")
-    public Result save(@RequestBody SeckillGoodsAddDTO seckillGoodsAddDTO){
+    public Result save(@Valid @RequestBody SeckillGoodsAddDTO seckillGoodsAddDTO){
         seckillService.add(seckillGoodsAddDTO);
         return Result.success();
     }
@@ -38,7 +39,7 @@ public class SeckillController {
     }
 
     @PutMapping("/update")
-    public Result update(@RequestBody SeckillGoodsUpdateDTO seckillGoodsUpdateDTO){
+    public Result update(@Valid @RequestBody SeckillGoodsUpdateDTO seckillGoodsUpdateDTO){
         SeckillGoods seckillGoods = new SeckillGoods();
         BeanUtils.copyProperties(seckillGoodsUpdateDTO,seckillGoods);
 

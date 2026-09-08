@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## 项目概述
 
-Fresh Market（fresh-market）：生鲜市场后端，Spring Boot 2.7.3 多模块 Maven 工程。代码注释、日志、commit message 均为中文，新增代码请保持一致的中文注释风格。
+Fresh Market（fresh-market）：生鲜市场后端，Spring Boot 3.5.16 多模块 Maven 工程（2026-09-08 从 2.7.18 迁移，jakarta 命名空间 + JDK 17 基线）。代码注释、日志、commit message 均为中文，新增代码请保持一致的中文注释风格。
 
 已实现业务：员工登录、商品、分类、地址簿、购物车、订单（含超时取消）、秒杀（含并发扣库存）、数据报表、管理端 AI 问答（function calling 查经营数据），以及通用基础设施（工具类、配置、拦截器、切面等）。
 
@@ -23,10 +23,9 @@ cd fresh-server && mvn spring-boot:run
 mvn test
 ```
 
-- **JDK 注意**：命令行 Maven 默认用 JDK 8（JAVA_HOME=D:\Java\jdk1.8），而 compiler 目标是 9，构建前需指定 JDK 17：`JAVA_HOME="C:\Program Files\Java\latest\jdk-17" mvn ...`。
+- **JDK 注意**：Boot 3.5 要求 JDK 17+（父 pom 默认按 release 17 编译，fresh-server 不再单独覆盖 compiler 插件），命令行 Maven 默认用 JDK 8（JAVA_HOME=D:\Java\jdk1.8）编不过，构建前需指定：`JAVA_HOME="C:\Program Files\Java\latest\jdk-17" mvn ...`。
 - 也可直接在 IDE 中运行启动类 `com.fresh.FreshApplication`（fresh-server 模块）。
-- 服务端口 8080，接口文档（knife4j）：http://localhost:8080/doc.html ，分"管理端接口"和"用户端接口"两个分组。
-- fresh-server 的 maven-compiler-plugin 设为 source/target 9，请使用 JDK 9+ 构建。
+- 服务端口 8080，接口文档（knife4j 4.x，基于 springdoc/OpenAPI3 注解）：http://localhost:8080/doc.html ，分"管理端接口"和"用户端接口"两个分组。
 - 测试：集成测试位于 `fresh-server/src/test/java`（连本机 MySQL/Redis/RabbitMQ，如 `SeckillOrderCancelTest`、`SeckillConcurrencyTest`），IDEA 中可直接点运行键，命令行跑法同上（需 JDK 17）。
 
 ## 运行环境依赖
@@ -34,7 +33,8 @@ mvn test
 启动前需保证本地中间件可用（配置见 `fresh-server/src/main/resources/application-dev.yml`）：
 
 - MySQL：localhost:3306，库 `fresh_market`
-- Redis：localhost:6379，密码 a123456（Redisson 客户端在 `RedisConfiguration` 中硬编码了该地址）
+- Redis：localhost:6379（Redisson 客户端在 `RedisConfiguration` 中读取 `fresh.redis.*` 配置，不再硬编码）
+- MySQL/Redis 的真实密码与 AI key 一样放在仓库外 `~/.fresh-market/application-secret.yml`，dev yml 只留占位符（`<your-mysql-password>` 等）；缺该文件的机器启动会连不上数据库/Redis
 - RabbitMQ：localhost:5672，vhost `/fresh`，用户 fresh_market/123（当前无消费者，不装延迟消息插件也可启动）
 
 ## 模块结构
@@ -60,7 +60,7 @@ mvn test
 
 ### 请求处理流
 
-Controller（`@RestController` + swagger 注解）→ Service 接口 + `service/impl` 实现 → Mapper（MyBatis，注解与 `resources/mapper/*.xml` 混用）。
+Controller（`@RestController` + OpenAPI3 注解：`@Tag`/`@Operation`/`@Schema`）→ Service 接口 + `service/impl` 实现 → Mapper（MyBatis，注解与 `resources/mapper/*.xml` 混用）。
 
 - 统一返回 `Result<T>` / `PageResult`；业务异常继承 `BaseException`，由 `handler/GlobalExceptionHandler` 统一处理。
 - 分页用 PageHelper：Service 中先 `PageHelper.startPage(page, pageSize)`，再用 `new Page<>(list)` 包装。

@@ -2,10 +2,10 @@
 local goodsId = ARGV[1]
 local userId = ARGV[2]
 
---库存key
+--库存key（与 RedisConstant.SECKILL_STOCK_KEY 保持一致，改名需两处同步）
 local stockKey = 'fresh:seckill:stock:'..goodsId
 
---订单key
+--订单key（与 RedisConstant.SECKILL_ORDER_KEY 保持一致，改名需两处同步）
 local orderKey = 'fresh:seckill:order:'..goodsId
 
 -- 判断库存是否充足（key不存在时get返回nil，视为库存不足，避免lua直接报错）

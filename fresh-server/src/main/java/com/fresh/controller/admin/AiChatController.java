@@ -4,8 +4,8 @@ import com.fresh.dto.AiChatDTO;
 import com.fresh.result.Result;
 import com.fresh.service.AiChatService;
 import com.fresh.vo.AiChatVO;
-import io.swagger.annotations.Api;
-import io.swagger.annotations.ApiOperation;
+import io.swagger.v3.oas.annotations.tags.Tag;
+import io.swagger.v3.oas.annotations.Operation;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -18,7 +18,7 @@ import org.springframework.web.bind.annotation.RestController;
  */
 @RestController
 @RequestMapping("/admin/ai")
-@Api(tags = "管理端AI对话相关接口")
+@Tag(name = "管理端AI对话相关接口")
 @Slf4j
 public class AiChatController {
 
@@ -31,7 +31,7 @@ public class AiChatController {
      * @return AI 的回答 + 本轮工具调用轨迹
      */
     @PostMapping("/chat")
-    @ApiOperation("AI对话提问")
+    @Operation(summary = "AI对话提问")
     public Result<AiChatVO> chat(@RequestBody AiChatDTO aiChatDTO) {
         log.info("管理端AI提问：{}", aiChatDTO.getQuestion());
         AiChatVO aiChatVO = aiChatService.chat(aiChatDTO.getQuestion());

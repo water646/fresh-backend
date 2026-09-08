@@ -33,15 +33,15 @@ public class SeckillOrderCancelTest extends SeckillTestSupport {
     @Test
     public void 待付款订单超时_应取消并回补数据库与Redis库存() throws Exception {
         insertGoods(5); //数据库库存5
-        SeckillOrders order = insertOrder("TC" + System.nanoTime(), 1, 0, TEST_USER);
+        SeckillOrders order = insertOrder("TC" + System.nanoTime(), SeckillOrders.PENDING_PAYMENT, SeckillOrders.PAY_STATUS_UNPAID, TEST_USER);
         stringRedisTemplate.opsForValue().set(stockKey(), "7"); //Redis库存7
         stringRedisTemplate.opsForSet().add(orderKey(), String.valueOf(TEST_USER));
 
         sendDelayMessage(order.getNumber(), 1000);
-        awaitOrderStatus(order.getNumber(), 6);
+        awaitOrderStatus(order.getNumber(), SeckillOrders.CANCELLED);
 
         SeckillOrders db = findByNumber(order.getNumber());
-        assertEquals(6, db.getStatus().intValue());
+        assertEquals(SeckillOrders.CANCELLED, db.getStatus());
         assertEquals("订单超时取消", db.getCancelReason());
         assertNotNull(db.getCancelTime());
         assertEquals(6, dbStock()); //数据库库存 5 + 1
@@ -55,7 +55,7 @@ public class SeckillOrderCancelTest extends SeckillTestSupport {
     @Test
     public void 已支付订单到时_不应取消也不应回补库存() throws Exception {
         insertGoods(5);
-        SeckillOrders order = insertOrder("TC" + System.nanoTime(), 2, 1, TEST_USER);
+        SeckillOrders order = insertOrder("TC" + System.nanoTime(), SeckillOrders.TO_BE_CONFIRMED, SeckillOrders.PAY_STATUS_PAID, TEST_USER);
         stringRedisTemplate.opsForValue().set(stockKey(), "7");
         stringRedisTemplate.opsForSet().add(orderKey(), String.valueOf(TEST_USER));
 
@@ -64,8 +64,8 @@ public class SeckillOrderCancelTest extends SeckillTestSupport {
         Thread.sleep(3500);
 
         SeckillOrders db = findByNumber(order.getNumber());
-        assertEquals(2, db.getStatus().intValue());
-        assertEquals(1, db.getPayStatus().intValue());
+        assertEquals(SeckillOrders.TO_BE_CONFIRMED, db.getStatus());
+        assertEquals(SeckillOrders.PAY_STATUS_PAID, db.getPayStatus());
         assertNull(db.getCancelReason());
         assertNull(db.getCancelTime());
         assertEquals(5, dbStock()); //库存原样
@@ -79,13 +79,13 @@ public class SeckillOrderCancelTest extends SeckillTestSupport {
     @Test
     public void 重复的取消消息_只回补一次库存() throws Exception {
         insertGoods(5);
-        SeckillOrders order = insertOrder("TC" + System.nanoTime(), 1, 0, TEST_USER);
+        SeckillOrders order = insertOrder("TC" + System.nanoTime(), SeckillOrders.PENDING_PAYMENT, SeckillOrders.PAY_STATUS_UNPAID, TEST_USER);
         stringRedisTemplate.opsForValue().set(stockKey(), "7");
         stringRedisTemplate.opsForSet().add(orderKey(), String.valueOf(TEST_USER));
 
         sendDelayMessage(order.getNumber(), 1000);
         sendDelayMessage(order.getNumber(), 1000);
-        awaitOrderStatus(order.getNumber(), 6);
+        awaitOrderStatus(order.getNumber(), SeckillOrders.CANCELLED);
         //再等第二条消息消费完（它会发现订单已取消而不回补）
         Thread.sleep(2500);
 
@@ -99,7 +99,7 @@ public class SeckillOrderCancelTest extends SeckillTestSupport {
     @Test
     public void 用户取消待付款订单_应取消并回补库存() {
         insertGoods(5);
-        SeckillOrders order = insertOrder("TC" + System.nanoTime(), 1, 0, TEST_USER);
+        SeckillOrders order = insertOrder("TC" + System.nanoTime(), SeckillOrders.PENDING_PAYMENT, SeckillOrders.PAY_STATUS_UNPAID, TEST_USER);
         stringRedisTemplate.opsForValue().set(stockKey(), "7");
         stringRedisTemplate.opsForSet().add(orderKey(), String.valueOf(TEST_USER));
 
@@ -111,7 +111,7 @@ public class SeckillOrderCancelTest extends SeckillTestSupport {
         }
 
         SeckillOrders db = findByNumber(order.getNumber());
-        assertEquals(6, db.getStatus().intValue());
+        assertEquals(SeckillOrders.CANCELLED, db.getStatus());
         assertEquals("用户取消订单", db.getCancelReason());
         assertNotNull(db.getCancelTime());
         assertEquals(6, dbStock()); //数据库库存 5 + 1
@@ -125,8 +125,8 @@ public class SeckillOrderCancelTest extends SeckillTestSupport {
     @Test
     public void 用户取消校验_越权与已支付订单都应被拒绝() {
         insertGoods(5);
-        SeckillOrders othersOrder = insertOrder("TC" + System.nanoTime(), 1, 0, 990002L);
-        SeckillOrders paidOrder = insertOrder("TC" + System.nanoTime(), 2, 1, TEST_USER);
+        SeckillOrders othersOrder = insertOrder("TC" + System.nanoTime(), SeckillOrders.PENDING_PAYMENT, SeckillOrders.PAY_STATUS_UNPAID, 990002L);
+        SeckillOrders paidOrder = insertOrder("TC" + System.nanoTime(), SeckillOrders.TO_BE_CONFIRMED, SeckillOrders.PAY_STATUS_PAID, TEST_USER);
         stringRedisTemplate.opsForValue().set(stockKey(), "7");
         stringRedisTemplate.opsForSet().add(orderKey(), String.valueOf(TEST_USER));
 
@@ -148,7 +148,7 @@ public class SeckillOrderCancelTest extends SeckillTestSupport {
         //两次拒绝都不该动任何数据
         assertEquals(5, dbStock());
         assertEquals("7", redisStock());
-        assertEquals(1, findByNumber(othersOrder.getNumber()).getStatus().intValue());
-        assertEquals(2, findByNumber(paidOrder.getNumber()).getStatus().intValue());
+        assertEquals(SeckillOrders.PENDING_PAYMENT, findByNumber(othersOrder.getNumber()).getStatus());
+        assertEquals(SeckillOrders.TO_BE_CONFIRMED, findByNumber(paidOrder.getNumber()).getStatus());
     }
 }

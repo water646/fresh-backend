@@ -15,6 +15,30 @@ import java.time.LocalDateTime;
 @TableName("seckill_orders")
 public class SeckillOrders {
 
+    /* ---------------- 订单状态常量（status 字段取值） ---------------- */
+
+    /** 待付款 */
+    public static final Integer PENDING_PAYMENT = 1;
+    /** 待接单 */
+    public static final Integer TO_BE_CONFIRMED = 2;
+    /** 已接单 */
+    public static final Integer CONFIRMED = 3;
+    /** 派送中 */
+    public static final Integer DELIVERY_IN_PROGRESS = 4;
+    /** 已完成 */
+    public static final Integer COMPLETED = 5;
+    /** 已取消 */
+    public static final Integer CANCELLED = 6;
+
+    /* ---------------- 支付状态常量（payStatus 字段取值） ---------------- */
+
+    /** 未支付 */
+    public static final Integer PAY_STATUS_UNPAID = 0;
+    /** 已支付 */
+    public static final Integer PAY_STATUS_PAID = 1;
+    /** 退款 */
+    public static final Integer PAY_STATUS_REFUND = 2;
+
     /**
      * 主键
      */

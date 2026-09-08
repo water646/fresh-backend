@@ -5,12 +5,11 @@ import com.fresh.dto.SeckillOrdersPayDTO;
 import com.fresh.result.PageResult;
 import com.fresh.result.Result;
 import com.fresh.service.SeckillOrdersService;
-import io.swagger.annotations.Api;
-import io.swagger.annotations.ApiOperation;
+import io.swagger.v3.oas.annotations.tags.Tag;
+import io.swagger.v3.oas.annotations.Operation;
 import lombok.extern.slf4j.Slf4j;
-import org.redisson.api.RLock;
-import org.redisson.api.RedissonClient;
 import org.springframework.beans.factory.annotation.Autowired;
+import jakarta.validation.Valid;
 import org.springframework.web.bind.annotation.*;
 
 /**
@@ -18,15 +17,12 @@ import org.springframework.web.bind.annotation.*;
  */
 @RestController("userSeckillOrdersController")
 @RequestMapping("/user/seckillOrders")
-@Api(tags = "C端秒杀订单相关接口")
+@Tag(name = "C端秒杀订单相关接口")
 @Slf4j
 public class SeckillOrdersController {
 
     @Autowired
     private SeckillOrdersService seckillOrdersService;
-
-    @Autowired
-    private RedissonClient redissonClient;
 
     /**
      * 分页查询当前用户自己的秒杀订单
@@ -34,7 +30,7 @@ public class SeckillOrdersController {
      * @return 分页结果，records 为 SeckillOrdersVO（多带秒杀商品名称）
      */
     @GetMapping("/page")
-    @ApiOperation("分页查询自己的秒杀订单")
+    @Operation(summary = "分页查询自己的秒杀订单")
     public Result<PageResult> page(SeckillOrdersPageQueryDTO seckillOrdersPageQueryDTO) {
         log.info("分页查询自己的秒杀订单：{}", seckillOrdersPageQueryDTO);
         PageResult pageResult = seckillOrdersService.pageQueryMine(seckillOrdersPageQueryDTO);
@@ -47,23 +43,11 @@ public class SeckillOrdersController {
      * @return 成功提示
      */
     @PutMapping("/payment")
-    @ApiOperation("秒杀订单支付（填写收货地址并支付）")
-    public Result payment(@RequestBody SeckillOrdersPayDTO seckillOrdersPayDTO) {
+    @Operation(summary = "秒杀订单支付（填写收货地址并支付）")
+    public Result payment(@Valid @RequestBody SeckillOrdersPayDTO seckillOrdersPayDTO) {
         log.info("秒杀订单支付：{}", seckillOrdersPayDTO);
-
-        //与普通订单支付一致：redisson 锁防误删、自动续期、支持阻塞等待、可重入
-        RLock lock = redissonClient.getLock("payment_lock:" + seckillOrdersPayDTO.getNumber());
-        if (!lock.tryLock()) {
-            return Result.error("请勿重复支付");
-        }
-
-        //拿到锁之后，执行支付逻辑
-        try {
-            seckillOrdersService.pay(seckillOrdersPayDTO);
-        } finally {
-            lock.unlock();
-        }
-
+        //防重复支付锁在 service 层（pay 内），controller 只做转发
+        seckillOrdersService.pay(seckillOrdersPayDTO);
         return Result.success();
     }
 
@@ -73,7 +57,7 @@ public class SeckillOrdersController {
      * @return 成功提示
      */
     @GetMapping("/cancel")
-    @ApiOperation("取消秒杀订单")
+    @Operation(summary = "取消秒杀订单")
     public Result cancel(Long id) {
         log.info("取消秒杀订单：{}", id);
         seckillOrdersService.cancel(id);

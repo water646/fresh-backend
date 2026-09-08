@@ -5,7 +5,7 @@ import com.fresh.dto.AddressBookDTO;
 import com.fresh.entity.AddressBook;
 import com.fresh.result.Result;
 import com.fresh.service.AddressBookService;
-import org.redisson.MapWriterTask;
+import jakarta.validation.Valid;
 import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
@@ -20,7 +20,7 @@ public class AddressBookController {
     AddressBookService addressBookService;
 
     @PostMapping("/add")
-    public Result add(@RequestBody AddressBookDTO addressBookDTO){
+    public Result add(@Valid @RequestBody AddressBookDTO addressBookDTO){
 
         Long userId = BaseContext.getCurrentId();
 

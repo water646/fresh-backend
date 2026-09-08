@@ -39,7 +39,8 @@ public interface SeckillOrdersService extends IService<SeckillOrders> {
 
     /**
      * 秒杀订单支付：用地址簿填充收货信息并完成支付
-     * （订单状态 1待付款→2待接单，payStatus 0→1，记录结账时间，快照收货人/手机号/详细地址）
+     * （订单状态 1待付款→2待接单，payStatus 0→1，记录结账时间，快照收货人/手机号/详细地址）。
+     * 内部按订单号加 Redisson 锁防重复支付，调用方无需自行加锁
      * @param seckillOrdersPayDTO 订单号 + 地址簿id + 支付方式
      */
     void pay(SeckillOrdersPayDTO seckillOrdersPayDTO);

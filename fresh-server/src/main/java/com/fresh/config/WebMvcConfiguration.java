@@ -13,12 +13,9 @@ import org.springframework.http.converter.json.MappingJackson2HttpMessageConvert
 import org.springframework.web.servlet.config.annotation.InterceptorRegistry;
 import org.springframework.web.servlet.config.annotation.ResourceHandlerRegistry;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurationSupport;
-import springfox.documentation.builders.ApiInfoBuilder;
-import springfox.documentation.builders.PathSelectors;
-import springfox.documentation.builders.RequestHandlerSelectors;
-import springfox.documentation.service.ApiInfo;
-import springfox.documentation.spi.DocumentationType;
-import springfox.documentation.spring.web.plugins.Docket;
+import org.springdoc.core.models.GroupedOpenApi;
+import io.swagger.v3.oas.models.OpenAPI;
+import io.swagger.v3.oas.models.info.Info;
 
 import java.util.List;
 
@@ -58,41 +55,36 @@ public class WebMvcConfiguration extends WebMvcConfigurationSupport {
     }
 
     /**
-     * 通过knife4j生成接口文档
-     * @return
+     * 管理端接口文档分组（原 springfox Docket 的 springdoc 等价物）
      */
     @Bean
-    public Docket docket1() {
-        ApiInfo apiInfo = new ApiInfoBuilder()
-                .title("Fresh Market项目接口文档")
-                .version("2.0")
-                .description("Fresh Market项目接口文档")
+    public GroupedOpenApi adminApi() {
+        return GroupedOpenApi.builder()
+                .group("管理端接口")
+                .pathsToMatch("/admin/**")
                 .build();
-        Docket docket = new Docket(DocumentationType.SWAGGER_2)
-                .groupName("管理端接口")
-                .apiInfo(apiInfo)
-                .select()
-                .apis(RequestHandlerSelectors.basePackage("com.fresh.controller.admin"))
-                .paths(PathSelectors.any())
-                .build();
-        return docket;
     }
 
+    /**
+     * 用户端接口文档分组
+     */
     @Bean
-    public Docket docket2() {
-        ApiInfo apiInfo = new ApiInfoBuilder()
+    public GroupedOpenApi userApi() {
+        return GroupedOpenApi.builder()
+                .group("用户端接口")
+                .pathsToMatch("/user/**")
+                .build();
+    }
+
+    /**
+     * 接口文档全局信息（标题、版本、描述）
+     */
+    @Bean
+    public OpenAPI openAPI() {
+        return new OpenAPI().info(new Info()
                 .title("Fresh Market项目接口文档")
                 .version("2.0")
-                .description("Fresh Market项目接口文档")
-                .build();
-        Docket docket = new Docket(DocumentationType.SWAGGER_2)
-                .groupName("用户端接口")
-                .apiInfo(apiInfo)
-                .select()
-                .apis(RequestHandlerSelectors.basePackage("com.fresh.controller.user"))
-                .paths(PathSelectors.any())
-                .build();
-        return docket;
+                .description("Fresh Market项目接口文档"));
     }
 
     /**
@@ -114,11 +106,13 @@ public class WebMvcConfiguration extends WebMvcConfigurationSupport {
     //扩展spring mvc框架的消息转换器
     @Override
     protected void extendMessageConverters(List<HttpMessageConverter<?>> converters) {
-        //消息转换器对象
-        MappingJackson2HttpMessageConverter converter = new MappingJackson2HttpMessageConverter();
-        //为消息转换器设置一个对象转换器
-        converter.setObjectMapper(new JacksonObjectMapper());
-
-        converters.add(0,converter);
+        //把自定义 ObjectMapper 设置到已有 Jackson 转换器上，而不是往队首插入新转换器：
+        //springdoc 的 /v3/api-docs 返回 byte[]，若 Jackson 转换器排在 ByteArray 转换器之前，
+        //byte[] 会被 Jackson 序列化成 base64 字符串，knife4j 文档页面解析失败
+        converters.stream()
+                .filter(MappingJackson2HttpMessageConverter.class::isInstance)
+                .map(MappingJackson2HttpMessageConverter.class::cast)
+                .findFirst()
+                .ifPresent(converter -> converter.setObjectMapper(new JacksonObjectMapper()));
     }
 }

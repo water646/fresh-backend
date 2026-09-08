@@ -25,8 +25,8 @@ import com.github.pagehelper.PageHelper;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Service;
-import org.springframework.util.DigestUtils;
 import org.springframework.util.StringUtils;
 
 import java.util.HashMap;
@@ -35,6 +35,12 @@ import java.util.Map;
 @Service
 @Slf4j
 public class EmployeeServiceImpl implements EmployeeService {
+
+    /**
+     * 密码哈希：BCrypt（自带盐、慢哈希，输出 60 字符、$2a$ 开头）。
+     * 库内存量已于 2026-09-08 由 MD5 全量迁移为 bcrypt(明文)，新增与比对统一走本编码器
+     */
+    private static final BCryptPasswordEncoder PASSWORD_ENCODER = new BCryptPasswordEncoder();
 
     @Autowired
     private EmployeeMapper employeeMapper;
@@ -60,8 +66,8 @@ public class EmployeeServiceImpl implements EmployeeService {
             throw new AccountNotFoundException(MessageConstant.ACCOUNT_NOT_FOUND);
         }
 
-        //密码比对（数据库存的是 MD5 值）
-        if (!DigestUtils.md5DigestAsHex(password.getBytes()).equals(employee.getPassword())) {
+        //密码比对（库里存 bcrypt(明文)）
+        if (!PASSWORD_ENCODER.matches(password, employee.getPassword())) {
             throw new PasswordErrorException(MessageConstant.PASSWORD_ERROR);
         }
 
@@ -111,8 +117,8 @@ public class EmployeeServiceImpl implements EmployeeService {
         Employee employee = new Employee();
         //属性拷贝（字段名和类型一致：name/username/phone/sex/idNumber）
         BeanUtils.copyProperties(employeeAddDTO, employee);
-        //密码加密存储（数据库存 MD5 值，与登录时的比对逻辑一致）
-        employee.setPassword(DigestUtils.md5DigestAsHex(employeeAddDTO.getPassword().getBytes()));
+        //密码加密存储（bcrypt(明文)，与登录时的比对逻辑一致）
+        employee.setPassword(PASSWORD_ENCODER.encode(employeeAddDTO.getPassword()));
         //新增员工默认启用
         employee.setStatus(StatusConstant.ENABLE);
         //createTime 等公共字段由 AutoFillAspect 在 insert 前自动填充

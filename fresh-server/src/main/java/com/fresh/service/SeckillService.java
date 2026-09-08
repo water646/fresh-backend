@@ -8,6 +8,8 @@ import com.fresh.entity.SeckillGoods;
 import com.fresh.result.PageResult;
 import com.fresh.result.Result;
 
+import java.util.Map;
+
 public interface SeckillService extends IService<SeckillGoods> {
     void add(SeckillGoodsAddDTO seckillGoodsAddDTO);
 
@@ -15,5 +17,5 @@ public interface SeckillService extends IService<SeckillGoods> {
 
     PageResult pageQuery(SeckillGoodsPageQueryDTO seckillGoodsPageQueryDTO);
 
-    Result seckill(Long seckillGoodsId);
+    Map<String,Object> seckill(Long seckillGoodsId);
 }
