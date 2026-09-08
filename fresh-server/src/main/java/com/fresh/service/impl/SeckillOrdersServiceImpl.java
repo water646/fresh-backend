@@ -26,10 +26,14 @@ import com.github.pagehelper.PageHelper;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.core.io.ClassPathResource;
+import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.data.redis.core.script.DefaultRedisScript;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -48,6 +52,16 @@ public class SeckillOrdersServiceImpl extends ServiceImpl<SeckillOrdersMapper, S
     private AddressBookMapper addressBookMapper;
     @Autowired
     private WebSocketServer webSocketServer;
+    @Autowired
+    private StringRedisTemplate stringRedisTemplate;
+
+    private static final DefaultRedisScript<Long> SECKILL_CANCEL_SCRIPT;
+    //在static代码块加载回补库存的lua脚本，返回值是Long
+    static {
+        SECKILL_CANCEL_SCRIPT = new DefaultRedisScript<>();
+        SECKILL_CANCEL_SCRIPT.setLocation(new ClassPathResource("seckillCancel.lua"));
+        SECKILL_CANCEL_SCRIPT.setResultType(Long.class);
+    }
 
     /**
      * 按id查秒杀订单详情（带秒杀商品名称）
@@ -161,6 +175,65 @@ public class SeckillOrdersServiceImpl extends ServiceImpl<SeckillOrdersMapper, S
         map.put("orderId", order.getId());
         map.put("content", "订单号：" + order.getNumber());
         webSocketServer.sendToAllClient(JSON.toJSONString(map));
+    }
+
+    /**
+     * 用户端取消秒杀订单：只有自己的待付款订单可取消，取消后回补库存
+     * @param id 秒杀订单id
+     */
+    @Transactional
+    public void cancel(Long id) {
+        Long userId = BaseContext.getCurrentId();
+        log.info("用户 {} 取消秒杀订单 {}", userId, id);
+
+        //查订单（不存在或不属于当前用户都按不存在处理，避免越权探测）
+        SeckillOrders order = seckillOrdersMapper.selectById(id);
+        if (order == null || !userId.equals(order.getUserId())) {
+            throw new BaseException("订单不存在");
+        }
+
+        //条件取消：只有待付款订单能取消，取消成功的同时回补库存
+        boolean cancelled = cancelAndRestore(order, "用户取消订单");
+        if (!cancelled) {
+            throw new OrderStatusException("只有待支付的订单可以取消");
+        }
+    }
+
+    /**
+     * 条件取消并回补库存（用户取消与超时取消共用）：
+     * 乐观锁保证只有待付款订单会被取消，已支付/重复消费时不动任何数据
+     * @param seckillOrders 秒杀订单（需带 id/seckillGoodsId/userId）
+     * @param cancelReason 取消原因
+     * @return true=本次真正取消并回补；false=订单不是待付款，未做任何改动
+     */
+    @Transactional
+    public boolean cancelAndRestore(SeckillOrders seckillOrders, String cancelReason) {
+        LambdaUpdateWrapper<SeckillOrders> uw = new LambdaUpdateWrapper<>();
+        uw.eq(SeckillOrders::getId, seckillOrders.getId());
+        uw.eq(SeckillOrders::getStatus, 1);
+        uw.set(SeckillOrders::getCancelTime, LocalDateTime.now());
+        uw.set(SeckillOrders::getCancelReason, cancelReason);
+        uw.set(SeckillOrders::getStatus, 6);
+
+        //rows>0 说明本次真正把订单从待付款改成已取消，此时才回补库存
+        int rows = seckillOrdersMapper.update(null, uw);
+        if (rows == 0) {
+            return false;
+        }
+
+        Long goodsId = seckillOrders.getSeckillGoodsId();
+
+        //回补数据库库存
+        seckillService.update(new LambdaUpdateWrapper<SeckillGoods>()
+                .setSql("stock = stock + 1")
+                .eq(SeckillGoods::getId, goodsId));
+
+        //回补Redis库存并解除一人一单（lua原子执行，避免与管理端预热缓存互相覆盖）
+        stringRedisTemplate.execute(SECKILL_CANCEL_SCRIPT, Collections.emptyList(),
+                goodsId.toString(), seckillOrders.getUserId().toString());
+
+        log.info("秒杀订单 {} 已取消（原因：{}），回补商品 {} 库存", seckillOrders.getNumber(), cancelReason, goodsId);
+        return true;
     }
 
     /**

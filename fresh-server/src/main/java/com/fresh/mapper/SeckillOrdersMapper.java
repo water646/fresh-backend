@@ -9,6 +9,7 @@ import org.apache.ibatis.annotations.Select;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
 
 /**
  * 秒杀订单 Mapper：继承 MyBatis-Plus 的 BaseMapper，自带单表 CRUD
@@ -41,4 +42,32 @@ public interface SeckillOrdersMapper extends BaseMapper<SeckillOrders> {
                                             @Param("beginTime") LocalDateTime beginTime,
                                             @Param("endTime") LocalDateTime endTime,
                                             @Param("userId") Long userId);
+
+    /**
+     * AI 工具查询：按商品名关键词统计秒杀渠道的商品销量
+     * 口径：已支付且未取消，按支付时间归属日期；秒杀每单限购 1 件，件数 = 订单数，金额 = 实收金额之和
+     * 按秒杀商品名分组返回 goodsName/quantity/amount，时间区间为左闭右开 [beginTime, endTime)
+     */
+    @Select("SELECT g.name AS goodsName, COUNT(*) AS quantity, SUM(o.amount) AS amount " +
+            "FROM seckill_orders o JOIN seckill_goods g ON o.seckill_goods_id = g.id " +
+            "WHERE o.pay_status = 1 AND o.status <> 6 " +
+            "AND o.checkout_time >= #{beginTime} AND o.checkout_time < #{endTime} " +
+            "AND g.name LIKE CONCAT('%', #{name}, '%') " +
+            "GROUP BY g.name ORDER BY quantity DESC")
+    List<Map<String, Object>> selectSeckillGoodsSales(@Param("name") String name,
+                                                      @Param("beginTime") LocalDateTime beginTime,
+                                                      @Param("endTime") LocalDateTime endTime);
+
+    /**
+     * AI 工具查询：秒杀订单渠道的订单统计（单行聚合）
+     * 口径：按下单时间归属日期；有效订单 = 已支付且未取消；营业额 = 有效订单实收金额之和
+     */
+    @Select("SELECT COUNT(*) AS totalOrders, " +
+            "SUM(CASE WHEN pay_status = 1 AND status <> 6 THEN 1 ELSE 0 END) AS validOrders, " +
+            "SUM(CASE WHEN status = 6 THEN 1 ELSE 0 END) AS cancelledOrders, " +
+            "SUM(CASE WHEN pay_status = 1 AND status <> 6 THEN amount ELSE 0 END) AS turnover " +
+            "FROM seckill_orders " +
+            "WHERE order_time >= #{beginTime} AND order_time < #{endTime}")
+    Map<String, Object> selectSeckillOrderStats(@Param("beginTime") LocalDateTime beginTime,
+                                                @Param("endTime") LocalDateTime endTime);
 }

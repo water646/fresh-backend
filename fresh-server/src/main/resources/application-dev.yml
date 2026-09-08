@@ -16,3 +16,16 @@ fresh:
     port: 6379
     password: a123456
     database: 0
+  ai:
+    api-key: <your-anthropic-api-key>   #真实key放在 ~/.fresh-market/application-secret.yml（仓库外），会覆盖这里的占位符
+    base-url: https://open.bigmodel.cn/api/anthropic   #留空直连官方API，走代理/中转服务时填写
+    model: glm-5.3
+#    base-url: https://api.deepseek.com/anthropic
+#    model: deepseek-chat
+
+
+#引入仓库外的私密配置（本机路径 ~/.fresh-market/application-secret.yml），
+#其中的值优先级高于本文件；文件不存在时 optional 前缀保证正常启动
+spring:
+  config:
+    import: optional:file:${user.home}/.fresh-market/application-secret.yml

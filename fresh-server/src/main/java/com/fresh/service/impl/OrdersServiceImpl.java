@@ -123,7 +123,7 @@ public class OrdersServiceImpl extends ServiceImpl<OrdersMapper,Orders> implemen
                 LambdaUpdateWrapper<Goods> uw = new LambdaUpdateWrapper<>();
                 uw.eq(Goods::getId,goodsId);
                 uw.ge(Goods::getStock,cart.getNumber());
-                uw.set(Goods::getStock,goods.getStock()-cart.getNumber());
+                uw.setSql("stock = stock - " + cart.getNumber());
 
                 int row = goodsMapper.update(null,uw);
                 if(row==0){

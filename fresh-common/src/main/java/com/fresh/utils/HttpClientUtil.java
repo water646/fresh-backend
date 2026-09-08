@@ -169,6 +169,68 @@ public class HttpClientUtil {
 
         return resultString;
     }
+    /**
+     * 发送POST方式请求，请求体为原始JSON字符串（可携带任意嵌套结构），
+     * 并支持自定义请求头（如鉴权 x-api-key）与超时时间
+     * @param url 请求地址
+     * @param jsonBody JSON格式的请求体字符串
+     * @param headers 请求头（键值对），可为null
+     * @param timeoutMsec 超时时间（毫秒），0表示用默认超时
+     * @return 响应体字符串
+     * @throws IOException
+     */
+    public static String doPostString(String url, String jsonBody, Map<String, String> headers, int timeoutMsec) throws IOException {
+        // 创建Httpclient对象
+        CloseableHttpClient httpClient = HttpClients.createDefault();
+        CloseableHttpResponse response = null;
+        String resultString = "";
+
+        try {
+            // 创建Http Post请求
+            HttpPost httpPost = new HttpPost(url);
+
+            // 设置自定义请求头
+            if (headers != null) {
+                for (Map.Entry<String, String> header : headers.entrySet()) {
+                    httpPost.setHeader(header.getKey(), header.getValue());
+                }
+            }
+
+            // 请求体为JSON字符串
+            StringEntity entity = new StringEntity(jsonBody, "utf-8");
+            entity.setContentEncoding("utf-8");
+            entity.setContentType("application/json");
+            httpPost.setEntity(entity);
+
+            //超时时间为0时沿用默认超时
+            RequestConfig requestConfig = timeoutMsec > 0
+                    ? RequestConfig.custom()
+                        .setConnectTimeout(timeoutMsec)
+                        .setConnectionRequestTimeout(timeoutMsec)
+                        .setSocketTimeout(timeoutMsec).build()
+                    : builderRequestConfig();
+            httpPost.setConfig(requestConfig);
+
+            // 执行http请求
+            response = httpClient.execute(httpPost);
+
+            resultString = EntityUtils.toString(response.getEntity(), "UTF-8");
+        } catch (Exception e) {
+            throw e;
+        } finally {
+            try {
+                if (response != null) {
+                    response.close();
+                }
+                httpClient.close();
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+        }
+
+        return resultString;
+    }
+
     private static RequestConfig builderRequestConfig() {
         return RequestConfig.custom()
                 .setConnectTimeout(TIMEOUT_MSEC)

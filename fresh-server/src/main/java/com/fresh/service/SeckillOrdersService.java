@@ -45,6 +45,21 @@ public interface SeckillOrdersService extends IService<SeckillOrders> {
     void pay(SeckillOrdersPayDTO seckillOrdersPayDTO);
 
     /**
+     * 用户端取消秒杀订单：只有自己的待付款订单可取消，取消后回补库存
+     * @param id 秒杀订单id
+     */
+    void cancel(Long id);
+
+    /**
+     * 条件取消秒杀订单并回补库存（数据库 + Redis + 解除一人一单）
+     * 用户取消与超时取消共用；乐观锁保证已支付/重复取消时不会误回补
+     * @param seckillOrders 秒杀订单（需带 id/seckillGoodsId/userId）
+     * @param cancelReason 取消原因（订单超时取消 / 用户取消订单）
+     * @return true=本次真正取消并回补；false=订单不是待付款，未做任何改动
+     */
+    boolean cancelAndRestore(SeckillOrders seckillOrders, String cancelReason);
+
+    /**
      * 修改秒杀订单（部分更新：只改传了的字段）
      * @param seckillOrdersUpdateDTO 修改内容（含订单id）
      */

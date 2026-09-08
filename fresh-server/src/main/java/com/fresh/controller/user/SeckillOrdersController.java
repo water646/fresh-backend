@@ -66,4 +66,17 @@ public class SeckillOrdersController {
 
         return Result.success();
     }
+
+    /**
+     * 取消秒杀订单（参考普通订单取消：只有待付款的订单可以取消，取消后回补库存）
+     * @param id 秒杀订单id
+     * @return 成功提示
+     */
+    @GetMapping("/cancel")
+    @ApiOperation("取消秒杀订单")
+    public Result cancel(Long id) {
+        log.info("取消秒杀订单：{}", id);
+        seckillOrdersService.cancel(id);
+        return Result.success();
+    }
 }
