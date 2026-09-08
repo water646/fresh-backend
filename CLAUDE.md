@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Fresh Market（fresh-market）：生鲜市场后端，Spring Boot 2.7.3 多模块 Maven 工程。代码注释、日志、commit message 均为中文，新增代码请保持一致的中文注释风格。
 
-当前仓库只包含从模板项目迁移过来的通用基础设施（工具类、配置、拦截器、切面等），业务代码（entity / dto / vo / controller / service / mapper）待开发。
+已实现业务：员工登录、商品、分类、地址簿、购物车、订单（含超时取消）、秒杀（含并发扣库存）、数据报表、管理端 AI 问答（function calling 查经营数据），以及通用基础设施（工具类、配置、拦截器、切面等）。
 
 ## 常用命令
 
@@ -42,7 +42,7 @@ mvn test
 | 模块 | 职责 |
 |---|---|
 | fresh-common | 工具类（JwtUtil、AliOssUtil、HttpClientUtil）、常量、枚举、Result/PageResult 统一返回、BaseContext、通用异常类、配置属性类 |
-| fresh-pojo | 纯数据对象：dto（前端请求）、entity（数据库表）、vo（前端响应），Lombok + swagger 注解。当前为空，业务开发时填充 |
+| fresh-pojo | 纯数据对象：dto（前端请求）、entity（数据库表）、vo（前端响应），Lombok + swagger 注解 |
 | fresh-server | 可运行的主应用：controller / service / mapper（待开发）、config / interceptor / aspect / task / websocket（已就绪） |
 
 依赖方向：fresh-server → fresh-common / fresh-pojo。改 pojo/common 后需重新构建才能被 server 引用到。

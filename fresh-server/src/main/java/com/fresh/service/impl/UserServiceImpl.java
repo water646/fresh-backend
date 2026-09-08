@@ -77,6 +77,8 @@ public class UserServiceImpl implements UserService {
         //1.校验验证码：从redis取出比对
         String codeKey = RedisConstant.LOGIN_CODE_KEY + phone;
         String codeInRedis = stringRedisTemplate.opsForValue().get(codeKey);
+
+        //TODO 开发阶段暂时使用万能验证码，到生产环境需删除
         if (codeInRedis == null&&!userLoginDTO.getCode().equals("123456")) {
             throw new LoginFailedException("验证码已失效，请重新获取");
         }

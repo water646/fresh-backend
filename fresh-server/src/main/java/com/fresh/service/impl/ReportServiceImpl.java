@@ -39,7 +39,6 @@ import java.util.Map;
 import java.util.stream.Collectors;
 
 /**
- * 数据统计服务（模仿苍穹外卖 ReportController 的功能）
  * 统计口径：营业额/有效订单/销量均只计"已完成"订单（status=5），按订单的下单时间归属到天
  */
 @Service
