@@ -257,6 +257,9 @@ public class OrdersServiceImpl extends ServiceImpl<OrdersMapper,Orders> implemen
         if(endTime != null){
             qw.le(Orders::getOrderTime,endTime);
         }
+        //下单时间倒序（最近的订单在最前面），同一时间下单的再按订单id倒序
+        qw.orderByDesc(Orders::getOrderTime);
+        qw.orderByDesc(Orders::getId);
 
         Page<Orders> list =(Page<Orders>) ordersMapper.selectList(qw);
 

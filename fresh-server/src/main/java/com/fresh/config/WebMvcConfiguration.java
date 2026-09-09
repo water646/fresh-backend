@@ -1,5 +1,6 @@
 package com.fresh.config;
 
+import com.fresh.interceptor.AdminRateLimitInterceptor;
 import com.fresh.interceptor.JwtTokenAdminInterceptor;
 import com.fresh.interceptor.JwtTokenUserInterceptor;
 import com.fresh.json.JacksonObjectMapper;
@@ -30,6 +31,9 @@ public class WebMvcConfiguration extends WebMvcConfigurationSupport {
     private JwtTokenAdminInterceptor jwtTokenAdminInterceptor;
 
     @Autowired
+    private AdminRateLimitInterceptor adminRateLimitInterceptor;
+
+    @Autowired
     private JwtTokenUserInterceptor jwtTokenUserInterceptor;
 
     @Autowired
@@ -45,6 +49,12 @@ public class WebMvcConfiguration extends WebMvcConfigurationSupport {
         //TODO 开发管理端登录接口后，放行登录路径，例如：
         //.excludePathPatterns("/admin/employee/login")
         registry.addInterceptor(jwtTokenAdminInterceptor)
+                .addPathPatterns("/admin/**")
+                .excludePathPatterns("/admin/employee/login");
+
+        //管理端接口限流：同一用户在窗口内最多调用 N 次（默认 60 次/分钟）。
+        //必须注册在 jwt 拦截器之后（依赖其解析出的员工id），登录路径同样放行
+        registry.addInterceptor(adminRateLimitInterceptor)
                 .addPathPatterns("/admin/**")
                 .excludePathPatterns("/admin/employee/login");
 

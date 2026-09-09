@@ -303,3 +303,28 @@ CREATE TABLE `seckill_orders` (
     KEY `idx_order_time` (`order_time`)
     
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='秒杀订单表';
+
+DROP TABLE IF EXISTS `goods_comments`;
+
+CREATE TABLE `goods_comments` (
+    `id`               bigint NOT NULL AUTO_INCREMENT COMMENT '主键',
+    `goods_id`         bigint NOT NULL COMMENT '商品id',
+    `user_id`          bigint NOT NULL COMMENT '评价用户id',
+    `order_id`         bigint NOT NULL COMMENT '订单id（校验评价资格用）',
+    `order_detail_id`  bigint NOT NULL COMMENT '订单明细id',
+    `rating`           tinyint NOT NULL COMMENT '评分 1-5星',
+    `content`          varchar(500) DEFAULT NULL COMMENT '评价内容',
+    `anonymous`        tinyint NOT NULL DEFAULT 0 COMMENT '是否匿名 0否 1是',
+    `reply`            varchar(500) DEFAULT NULL COMMENT '商家回复',
+    `reply_time`       datetime DEFAULT NULL COMMENT '商家回复时间',
+    `status`           tinyint NOT NULL DEFAULT 1 COMMENT '状态 1显示 0隐藏（管理端下架违规评价）',
+    `create_time`      datetime DEFAULT NULL COMMENT '创建时间',
+    `update_time`      datetime DEFAULT NULL COMMENT '修改时间',
+    `create_user`      bigint DEFAULT NULL COMMENT '创建人（用户端为用户id）',
+    `update_user`      bigint DEFAULT NULL COMMENT '修改人',
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `uk_order_detail` (`order_detail_id`),
+    KEY `idx_goods_id` (`goods_id`)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='商品评价表';
+
+

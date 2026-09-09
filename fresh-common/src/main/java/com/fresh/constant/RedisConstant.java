@@ -42,4 +42,10 @@ public class RedisConstant {
      * 支付接口防重复提交的 Redisson 分布式锁key前缀，完整key为 payment_lock:订单号
      */
     public static final String PAYMENT_LOCK_KEY = "payment_lock:";
+
+    /**
+     * 管理端接口限流计数的key前缀，完整key为 admin:rate:员工id，
+     * value 为窗口内调用次数，TTL 即窗口时长（计数逻辑见 ratelimit.lua / AdminRateLimitInterceptor）
+     */
+    public static final String ADMIN_RATE_LIMIT_KEY = "admin:rate:";
 }

@@ -164,6 +164,8 @@ PageResult对象:
 private long total; //总记录数
 private List records; //当前页数据集合
 
+排序规则：按下单时间（orderTime）倒序，最近的订单在最前面；同一时间下单的再按订单 id 倒序（2026-09-09 起）。
+
 ### 2.6 管理端接单
 
 `GET /admin/orders/confirm?id={id}`（需 token）
